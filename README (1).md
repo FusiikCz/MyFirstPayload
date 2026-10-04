@@ -1,95 +1,105 @@
 # MyFirstPayload — lab-only XSS/replication research PoC
 
-> ## ⚠️ DISCLAIMER — PŘEČTI SI PŘED ČIMKOLIV
-> Tento repozitář je **laboratorní výzkumný materiál** pro vlastní izolované
-> prostředí. **Není to nástroj k útoku na reálné weby.** Veškerý spustitelný
-> kód je záměrně inertní vůči internetu (host-guard na `lab.local`, C2 na
-> `127.0.0.1`, samo-replikace defaultně vypnutá). Zneužití proti cizím
-> systémům je nelegální. Detaily: **[DISCLAIMER.md](DISCLAIMER.md)**.
+> ## ⚠️ DISCLAIMER — READ BEFORE PROCEEDING
+> This repository is **laboratory research material** intended for an
+> isolated environment that you own. It is **not a tool for attacking real
+> websites**. Executable code is deliberately inert outside the lab (host
+> guard for `lab.local`, C2 at `127.0.0.1`, self-replication disabled by
+> default). Attacking systems without authorization is illegal. See
+> **[DISCLAIMER.md](DISCLAIMER.md)** for details.
 
-## Co repo ukazuje
+## What this repository demonstrates
 
-Kompletní **attack chain case study** — a především **jak se proti ní brát**:
+A complete **attack-chain case study** — and, above all, **how to defend
+against it**:
 
 ```
-[stored XSS v obsahu inzerátu]
-        │  návštěvník zobrazí obsah → spustí se inline JS
+[stored XSS in an ad]
+        │  a visitor views the content → inline JS runs
         ▼
-[payload] ──sběr: cookies / klávesy / paste / formuláře──► [C2 server]
+[payload] ──collects cookies / keystrokes / paste / forms──► [C2 server]
         │                                                    │
-        └──beacon: čeká na příkaz───────────────────────────► │
+        └──beacon: waits for a command──────────────────────► │
                                                              ▼
-                                              [SPREAD] replikační smyčka:
-                                              OCR captchy → nový infikovaný
-                                              obsah → nová infekce → ...
+                                              [SPREAD] replication loop:
+                                              CAPTCHA OCR → new infected
+                                              content → new infection → ...
 ```
 
-**Hlavní hodnota repo: DEFENSE.md** — konkrétní obrana pro každou vrstvu
-(CSP, output escaping, HttpOnly, rate-limity, detekce, server hardening).
+**The repository's main value is `DEFENSE.md`** — concrete defenses for each
+layer (CSP, output escaping, HttpOnly, rate limits, detection, and server
+hardening).
 
-## Struktura
+## Contents
 
-| Soubor | Co je |
+| File | Description |
 |---|---|
-| `DISCLAIMER.md` | etické a právní hranice — povinné čtení |
-| `DEFENSE.md` | **jádro repo**: obrana proti celému řetězu |
-| `c2.py` | sběrný/řídicí server (LAB-ONLY: bind 127.0.0.1, token-protected) |
-| `payload_lab.txt` | inertní keylogger demo (guard `lab.local`, C2 localhost) |
-| `worm_lab.txt` | inertní replikační demo (self-replikace defaultně OFF) |
-| `lab/` | mock web (zranitelná + zabezpečená varianta) + captcha + `test_c2.sh` |
-| `captcha_ocr.py` | OCR pipeline pro captcha vzorky (segmentace + hlasování) |
+| `DISCLAIMER.md` | Ethical and legal boundaries — read first |
+| `DEFENSE.md` | **Core of the repository:** defenses for the full chain |
+| `c2.py` | Collection/control server (LAB ONLY: binds to 127.0.0.1, token-protected) |
+| `payload_lab.txt` | Inert keylogger demo (guarded to `lab.local`, C2 on localhost) |
+| `worm_lab.txt` | Inert replication demo (self-replication disabled by default) |
+| `index.php`, `captcha.php` | Mock website and CAPTCHA (vulnerable and patched modes) |
+| `test_c2.sh`, `gen_captcha.py` | C2 smoke test and test CAPTCHA generator |
 
-## Proč je kód inertní (a proč to tak zůstane)
+## Why the code is inert (and why it must stay that way)
 
-| Zábrana | Efekt |
+| Safeguard | Effect |
 |---|---|
-| `if(location.host.indexOf("lab.local")<0)return` | na jakémkoli jiném webu se kód nespustí; `lab.local` neexistuje veřejně |
-| `C = http://127.0.0.1:8080` | data zůstávají na lokálním stroji |
-| `P = base64("LABPAYLOADB64")` | replikační smyčka vkládá neškodný placeholder, dokud ji výslovně nezapneš v labu |
+| `if(location.host.indexOf("lab.local")<0)return` | The code will not run on another website; `lab.local` is not a public domain |
+| `C = http://127.0.0.1:8080` | Data stays on the local machine |
+| `P = base64("LABPAYLOADB64")` | The replication loop inserts a harmless placeholder unless deliberately changed in the lab |
 
-**Neměň tyto zábrany.** K zodpovězení "jak by se to dalo zneužit" netřeba
-funkční zbraň — attack chain je popsaný a obrana testovatelná na mocku.
+**Do not remove these safeguards.** Understanding how an attack chain works
+does not require a functional weapon; the chain is described and defenses
+can be tested against the mock.
 
-## Jak spustit lab (5 minut)
+## Run the lab
 
 ```bash
-# 1) hosts:  127.0.0.1   lab.local
-# 2) mock web:   cd lab && php -S 0.0.0.0:8000      (php-gd potřebné)
-# 3) C2:         python3 c2.py                      (vypíše TOKEN)
-# 4) prohlížeč:  http://lab.local:8000              (VULNERABLE)
-#                http://lab.local:8000/?safe=1      (PATCHED — obrana)
+# Dependencies: python3 -m pip install -r requirements.txt
+#               PHP GD and Tesseract (e.g. sudo apt install php-gd tesseract-ocr)
+# 1) hosts file: 127.0.0.1   lab.local
+# 2) mock website: php -S 127.0.0.1:8000 -t . (from the repository root)
+# 3) C2 server:    python3 c2.py (prints the TOKEN)
+# 4) browser:      http://lab.local:8000       (VULNERABLE)
+#                  http://lab.local:8000/?safe=1 (PATCHED — defense)
 ```
 
-Detaily a testovací scénáře: `lab/README.md`.
-Rychlý self-test C2 (token, sběr, beacon/spread, OCR) bez prohlížeče:
+See `README.md` for details and test scenarios. Run the C2 self-test without
+a browser:
 
 ```bash
-bash lab/test_c2.sh     # PASS=10 FAIL=0 = vše v pořádku
+bash test_c2.sh         # with Tesseract: PASS=10 FAIL=0 SKIP=0
 ```
 
 ## Research notes
 
-- **OCR captcha:** segmentace po sloupcích + per-cell tesseract s hlasováním
-  přes konfigurace (výška × PSM × inverze). Úspěšnost ~70–85 % na součet
-  prvních dvou číslic; slabinou jsou slepené číslice a kurzívní "7".
-- **Replikace bez retry:** selhání OCR = tichý konec smyčky → reálný útočník
-  by musel řešit retry; to je zároveň přirozený braking point, který lze
-  na serveru zesílit rate-limitem.
-- **C2 bez auth = self-own:** původní návrh nechával `/export` otevřený
-  (kdokoli by stáhl ukradená data). Sanitizovaná verze tokenizuje
-  vše řídící a binduje jen na localhost.
+- **CAPTCHA OCR:** Column segmentation and per-cell Tesseract voting across
+  multiple configurations (height × PSM × inversion). Accuracy for the sum
+  of the first two digits is approximately 70–85%; touching digits and
+  italic "7" are common failure cases.
+- **Replication without retries:** An OCR failure quietly ends the loop.
+  Rate limiting on the server can further constrain automated submissions.
+- **C2 without authentication is a liability:** The original design left
+  `/export` open, exposing collected data to anyone. This sanitized version
+  protects control endpoints with a token and binds only to localhost.
 
-## Obrana — TL;DR
+## Defense — TL;DR
 
-1. **CSP bez `unsafe-inline`** — zabije inline `onerror` i exfiltraci.
-2. **`htmlspecialchars` na výstupu** — odstraní samotný stored XSS.
-3. **HttpOnly/Secure/SameSite cookies** — session nelze ukrást JS.
-4. **Rate-limit + oprava captchy** — ztíží replikaci k nepoužitelnosti.
-5. **Detekce** — CSP reporty, outbound monitoring, DB audit na payload vzory.
+1. **CSP without `unsafe-inline`** — blocks inline `onerror` handlers and
+   exfiltration.
+2. **`htmlspecialchars` on output** — prevents stored XSS.
+3. **HttpOnly/Secure/SameSite cookies** — JavaScript cannot read the session
+   cookie.
+4. **Rate limits and a stronger CAPTCHA** — make automated submissions less
+   effective.
+5. **Detection** — CSP reports, outbound monitoring, and database audits for
+   payload patterns.
 
-Detailně s kódem: **DEFENSE.md**.
+See **`DEFENSE.md`** for implementation examples.
 
-## Licence a užití
+## License and use
 
-Viz DISCLAIMER.md. Používej výhradně na vlastních systémech nebo s písemným
-oprávněním vlastníka.
+See `DISCLAIMER.md`. Use this material only on systems you own or have
+explicit written permission to test.

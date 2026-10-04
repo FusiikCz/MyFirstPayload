@@ -1,30 +1,37 @@
-# DISCLAIMER / ETICKÉ A PRÁVNÍ HRANICE
+# DISCLAIMER / ETHICAL AND LEGAL BOUNDARIES
 
-**Tento repozitář je výhradně laboratorní výzkumný materiál.**
+**This repository is laboratory research material only.**
 
-## Co to je
-Vzdělávací proof-of-concept ukazující, jak vypadá řetěz *stored XSS →
-keylogger → replikační smyčka* a — především — **jak se proti němu bránit**
-(DEFENSE.md).
+## What this is
 
-## Co to NENÍ a nesmí být
-- **Není to nástroj k nasazení proti jakémukoli reálnému webu.**
-- Veškerý testovací kód je záměrně inertní vůči veřejnému internetu:
-  - host-guard povoluje spuštění jen na `lab.local` (neexistující doména,
-    mapovaná lokálně v `/etc/hosts`),
-  - C2 adresa je `127.0.0.1`,
-  - samo-replikace je defaultně vypnutá (placeholder).
-- **Změna těchto zábran a použití proti cizím systémům je NELEGÁLNÍ**
-  (v ČR: §180 trestného činu neoprávněný přístup, §181 neoprávněný vnik,
-  §232 poškozování cizích práv; obdobné zákony existují ve všech jurisdikcích).
+An educational proof of concept demonstrating a *stored XSS → keylogger →
+replication loop* chain and, above all, **how to defend against it**
+(`DEFENSE.md`).
 
-## Souhlas a odpovědnost
-- Používej výhradně na systémech, **které vlastníš**, nebo na kterých máš
-  **písemné oprávnění** vlastníka (bug bounty scope, smlouva).
-- Autor repozitáře neodpovídá za zneužití třetími stranami; stažení/klonování
-  nezakládá oprávnění k testování cizích systémů.
-- Zveřejnění má výzkumný a obranný účel: pochopit útok, aby se dal zastavit.
+## What this is not — and must not become
+
+- **It is not a tool to deploy against any real website.**
+- All test code is deliberately inert outside the lab:
+  - The host guard allows execution only on `lab.local`, a non-public domain
+    mapped locally in `/etc/hosts`.
+  - The C2 address is `127.0.0.1`.
+  - Self-replication is disabled by default (placeholder).
+- **Removing these safeguards and using the code against systems without
+  permission is illegal.** Laws vary by jurisdiction; obtain authorization
+  before testing.
+
+## Consent and responsibility
+
+- Use this only on systems **you own** or for which you have the owner's
+  **written authorization** (for example, an in-scope bug bounty or contract).
+- The repository author is not responsible for third-party misuse. Downloading
+  or cloning this repository does not grant permission to test someone else's
+  systems.
+- This material is published for research and defense: to understand an
+  attack so it can be stopped.
 
 ## If you are a defender
-Jsi na správném místě: celý útok je zde rozebrán jako obranný case study.
-Začni u **DEFENSE.md** — CSP, output escaping, HttpOnly, rate-limity a detekce.
+
+You are in the right place: this repository examines the chain as a defensive
+case study. Start with **`DEFENSE.md`** for CSP, output escaping, HttpOnly,
+rate limits, and detection.

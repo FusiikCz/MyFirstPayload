@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Vygeneruje ukázkovou lab captchu (styl lab/captcha.php) a zapíše ji do
-/tmp/cap_lab.jpg. Do /tmp/cap_lab.info uloží 'digits=NNNN sum=N'.
+"""Generate a sample lab CAPTCHA (in the style of captcha.php) and save it to
+/tmp/cap_lab.jpg. Write 'digits=NNNN sum=N' to /tmp/cap_lab.info.
 
-Používá se v lab/test_c2.sh k ověření OCR endpointu /solve.
-LAB ONLY — neslouží k žádnému obcházení reálných systémů.
+Used by test_c2.sh to verify the /solve OCR endpoint.
+LAB ONLY — not for bypassing real-world systems.
 """
 import random
 from PIL import Image, ImageDraw

@@ -1,12 +1,12 @@
 <?php
 /**
- * LAB MOCK WEB — zranitelná a zabezpečená varianta stejné appky.
- * Slouží k demonstraci: stored XSS keylogger/worm chain + účinnost obrany.
+ * LAB MOCK WEBSITE — vulnerable and patched versions of the same app.
+ * Demonstrates a stored XSS/keylogger/worm chain and defense effectiveness.
  *
- *   index.php           -> VULNERABLE (výstup bez escapování, bez CSP)
- *   index.php?safe=1    -> PATCHED    (htmlspecialchars + CSP hlavička)
+ *   index.php           -> VULNERABLE (unescaped output, no CSP)
+ *   index.php?safe=1    -> PATCHED (htmlspecialchars + CSP header)
  *
- * LAB ONLY. Nesmí být nasazeno veřejně.
+ * LAB ONLY. Must not be deployed publicly.
  */
 session_start();
 $SAFE  = isset($_GET['safe']);
@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $kod = $_POST['kod'] ?? '';
     $expected = $_SESSION['kod'] ?? null;
     if ($expected === null || $kod === '' || (int)$kod !== (int)$expected) {
-        $err = 'Spatna captcha (kod).';
+        $err = 'Incorrect CAPTCHA code.';
     } else {
         $ads[] = [
             'jmeno' => ($_POST['jmeno'] ?? 'anon'),
@@ -47,12 +47,12 @@ if ($SAFE) {
  form{background:#fff;border:1px solid #ccc;padding:12px;margin-top:20px}
  input,textarea{display:block;margin:6px 0;width:100%}
 </style>
-<h1>LAB mock web — <?= $SAFE ? '<span class=good>PATCHED (escaped + CSP)</span>' : '<span class=bad>VULNERABLE (raw output)</span>' ?></h1>
-<p>Stejná aplikace ve dvou režimech. Vlož payload do "Text" a porovnej chování.</p>
+<h1>LAB mock website — <?= $SAFE ? '<span class=good>PATCHED (escaped + CSP)</span>' : '<span class=bad>VULNERABLE (raw output)</span>' ?></h1>
+<p>The same application in two modes. Enter the test sample in "Text" and compare the behavior.</p>
 
 <?php foreach ($ads as $a): ?>
   <div class="ad">
-    <b>Jmeno:</b>
+    <b>Name:</b>
     <?= $SAFE ? htmlspecialchars($a['jmeno'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : $a['jmeno'] ?>
     <br>
     <?= $SAFE ? htmlspecialchars($a['text'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : $a['text'] ?>
@@ -60,13 +60,13 @@ if ($SAFE) {
 <?php endforeach; ?>
 
 <form method="post" action="index.php<?= $SAFE ? '?safe=1' : '' ?>">
-  <h3>Nový inzerát</h3>
+  <h3>New ad</h3>
   <?php if ($err): ?><p class="bad"><?= htmlspecialchars($err) ?></p><?php endif; ?>
-  <input name="jmeno" placeholder="jmeno" value="LabTester">
-  <textarea name="TextArea" rows="5" placeholder="Text (sem vloz payload)"></textarea>
-  <label>Captcha: <img src="captcha.php" alt="captcha"
+  <input name="jmeno" placeholder="Name" value="LabTester">
+  <textarea name="TextArea" rows="5" placeholder="Text (enter test sample here)"></textarea>
+  <label>CAPTCHA: <img src="captcha.php" alt="CAPTCHA"
         style="vertical-align:middle;border:1px solid #999"></label>
-  <input name="kod" placeholder="soucte prvni 2 cislice" style="width:180px">
-  <button name="button" value="Odeslat">Odeslat</button>
+  <input name="kod" placeholder="sum of the first 2 digits" style="width:180px">
+  <button name="button" value="Submit">Submit</button>
 </form>
-<p><a href="index.php<?= $SAFE ? '' : '?safe=1' ?>">Přepnout na <?= $SAFE ? 'VULNERABLE' : 'PATCHED' ?> režim</a></p>
+<p><a href="index.php<?= $SAFE ? '' : '?safe=1' ?>">Switch to <?= $SAFE ? 'VULNERABLE' : 'PATCHED' ?> mode</a></p>

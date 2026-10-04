@@ -1,10 +1,10 @@
-# DEFENSE — jak tento útok zastavit
+# DEFENSE — How to stop this attack
 
-Řetěz: **stored XSS → keylogger/krádež session → (volitelně) replikační smyčka
-s OCR captchy**. Každá vrstva má konkrétní obranu. Nejúčinnější opatření jsou
-na začátku.
+Chain: **stored XSS → keylogger/session theft → (optional) replication loop
+using CAPTCHA OCR**. Each layer has a concrete defense. The most effective
+measures are at the beginning of the chain.
 
-## 1. Zlikvidovat spouštěč: CSP bez `unsafe-inline` (největší dopad)
+## 1. Block execution: CSP without `unsafe-inline` (highest impact)
 
 ```
 Content-Security-Policy: default-src 'self';
@@ -17,27 +17,28 @@ Content-Security-Policy: default-src 'self';
   frame-ancestors 'self'
 ```
 
-- Bez `unsafe-inline` se **žádný inline handler** (`onerror=`) nespustí
-  → payload se nespustí vůbec.
-- `connect-src 'self'` + `img-src 'self'` zablokují i exfiltraci na C2
-  (`new Image().src`, XHR na cizí doménu).
-- Nasazuj postupně: nejdřív `Content-Security-Policy-Report-Only`, sbírej
-  reporty, dolad, pak enforce.
+- Without `unsafe-inline`, inline handlers such as `onerror=` will not run,
+  so the payload does not execute.
+- `connect-src 'self'` and `img-src 'self'` block exfiltration to a third-
+  party C2 through `new Image().src` or XHR.
+- Roll out gradually: start with `Content-Security-Policy-Report-Only`,
+  review reports, then switch to enforcement.
 
-## 2. Escapovat výstup (odstranit kořen: stored XSS)
+## 2. Escape output (remove the root cause: stored XSS)
 
-Všechna uživatelská pole escapovat při renderu (PHP):
+Escape all user-provided fields when rendering them (PHP):
 
 ```php
 echo htmlspecialchars($ad['text'], ENT_QUOTES | ENT_HTML5, 'UTF-8');
 ```
 
-- Escapuj **při výstupu**, ne při uložení (data se mohou hodit i jinam).
-- Doplňkově: validace na vstupu (délka, povolené tagy = žádné).
-- Druhá vrstva: scrubbing uloženého obsahu (knihovna typu HTMLPurifier),
-  pokud musí být HTML povoleno.
+- Escape **on output**, not when storing data; the same data may be used
+  elsewhere.
+- Also validate input (length and allowed markup — preferably none).
+- If HTML must be allowed, sanitize stored content with a library such as
+  HTMLPurifier as an additional layer.
 
-## 3. Session ochrana
+## 3. Protect sessions
 
 ```php
 session_set_cookie_params([
@@ -46,44 +47,50 @@ session_set_cookie_params([
 ]);
 ```
 
-- `HttpOnly` → `document.cookie` nevrátí PHPSESSID → krádež session padá.
-- `SameSite` omezuje cross-site použítí.
-- Rotace ID po přihlášení (`session_regenerate_id(true)`).
+- `HttpOnly` prevents `document.cookie` from returning the PHPSESSID, blocking
+  this method of session theft.
+- `SameSite` limits cross-site cookie use.
+- Rotate the session ID after login with `session_regenerate_id(true)`.
 
-## 4. Captcha a rate-limity (proti automatizaci)
+## 4. CAPTCHA and rate limits (against automation)
 
-- Ta captcha je slabá: 4 číslice, odpověď = **součet prvních dvou**
-  (pouhých 19 možností) + OCR čitelné ~70–85 %. Vylepšení:
-  - nepoužívat aritmetiku z viditelných číslic; standardní decode úlohy,
-  - zkreslení/šum, který neškodí čitelnosti pro lidi,
-  - limit na nová API key (Google reCAPTCHA/Turnstile) pro citlivé akce.
-- **Rate-limit** na vkládání: per-IP + per-session, např. max 3 inzeráty/hod.
-- **Opravit Fatal error**: vstup `kod` validovat server-side (`ctype_digit`),
-  vypnout `display_errors` (info leak cesty `/www/hosting/...`).
+- This CAPTCHA is weak: four digits, with the answer equal to the **sum of
+  the first two** (only 19 possible results), and OCR readability of roughly
+  70–85%. Improvements:
+  - Do not derive the answer arithmetically from visible digits; use a
+    standard challenge.
+  - Add distortion/noise that does not impair human readability.
+  - Consider Google reCAPTCHA or Turnstile for sensitive actions.
+- **Rate-limit** submissions per IP and per session, e.g. at most three ads
+  per hour.
+- **Fix fatal errors:** validate the `kod` input server-side (for example
+  with `ctype_digit`) and disable `display_errors` to prevent path disclosure
+  such as `/www/hosting/...`.
 
-## 5. Detekce (co nastavit hned)
+## 5. Detection (what to configure now)
 
-| Signál | Kde | Pravidlo |
+| Signal | Where | Rule |
 |---|---|---|
-| Inline script pokusy | CSP reporty | report-only → alarm na `/k?`, `/hello?co=` |
-| Outbound na cizí IP | WAF/proxy log | `img-src`/XHR z prohlížečů na neznámé IP |
-| Hromadné POSTy | access log | >N POSTů na vkládání z jedné session/IP |
-| Payload v DB | DB audit | sken uložených textů na `onerror=`, `<script`, `javascript:` |
-| Chybějící hlavičky | security scan | chybí CSP/X-Frame-Options/HttpOnly |
+| Inline script attempts | CSP reports | Start in report-only mode; alert on `/k?` and `/hello?co=` |
+| Outbound requests to unknown IPs | WAF/proxy logs | Detect browser image/XHR requests to unknown IPs |
+| Bulk POST requests | Access logs | Alert on more than N ad submissions from one session/IP |
+| Payloads in the database | Database audit | Scan stored text for `onerror=`, `<script`, and `javascript:` |
+| Missing headers | Security scan | Check for CSP, X-Frame-Options, and HttpOnly |
 
 ## 6. Server hardening
 
-- Zavřít nepotřebné porty (FTP/POP3/IMAP); SFTP místo FTP.
-- SSH: klíče, `PasswordAuthentication no`, fail2ban; ztracené heslo resetovat
-  **přes konzoli poskytovatele**, ne brute-force.
-- `display_errors=Off`, `log_errors=On`, oddělit error logy od webu.
-- Zálohy DB a pravidelný audit uloženého obsahu.
+- Close unnecessary ports (FTP/POP3/IMAP); use SFTP instead of FTP.
+- For SSH, use keys, set `PasswordAuthentication no`, and use fail2ban.
+  Reset a lost password **through the provider console**, not by brute force.
+- Set `display_errors=Off` and `log_errors=On`; keep error logs outside the
+  web root.
+- Back up the database and regularly audit stored content.
 
-## 7. Ověření obrany (test, který chceš udělat)
+## 7. Verify the defense
 
-V labu (`lab/`) máš dvě varianty téže appky:
-- `index.php` (VULNERABLE) — payload se spustí,
-- `index.php?safe=1` (PATCHED: escaping + CSP) — payload se nespustí.
+The lab has two modes of the same app:
+- `index.php` (VULNERABLE) — the payload runs.
+- `index.php?safe=1` (PATCHED: escaping + CSP) — the payload does not run.
 
-Vlož stejný payload do obou a porovnej: v PATCHED režimu se žádné události
-na C2 neobjeví. To je měřitelný důkaz účinnosti obrany.
+Submit the same test input in both modes and compare the results. In PATCHED
+mode, no events should appear in C2. This is a measurable defense check.

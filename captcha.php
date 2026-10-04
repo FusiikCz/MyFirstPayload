@@ -1,10 +1,10 @@
 <?php
 /**
- * LAB MOCK CAPTCHA — stejné schéma jako ve výzkumu: 4 bílé číslice na zeleném
- * pozadí, odpověď = součet prvních dvou. Slouží k testování OCR (/solve)
- * a k demonstraci, proč je taková captcha slabá (viz DEFENSE.md).
+ * LAB MOCK CAPTCHA — same scheme as the research sample: four white digits
+ * on a green background; the answer is the sum of the first two. Used to test
+ * OCR (/solve) and demonstrate why this CAPTCHA is weak (see DEFENSE.md).
  *
- * Vyžaduje PHP GD rozšíření:  sudo apt install php-gd
+ * Requires the PHP GD extension: sudo apt install php-gd
  * LAB ONLY.
  */
 session_start();
@@ -19,12 +19,12 @@ $white = imagecolorallocate($im, 255, 255, 255);
 $blue  = imagecolorallocate($im, 60, 90, 200);
 
 imagefilledrectangle($im, 0, 0, 99, 29, $green);
-for ($i = 0; $i < 6; $i++) {           // šum
+for ($i = 0; $i < 6; $i++) {           // noise
     imageline($im, random_int(0, 99), random_int(0, 29),
                     random_int(0, 99), random_int(0, 29), $blue);
 }
 $x = 14;
-foreach ($d as $c) {                   // číslice
+foreach ($d as $c) {                   // digits
     imagestring($im, 5, $x, random_int(4, 10), (string)$c, $white);
     $x += 20;
 }
