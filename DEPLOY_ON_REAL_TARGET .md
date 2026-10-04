@@ -392,3 +392,4 @@ See `DEFENSE.md` for detailed defense measures:
 
 **Remember**: These changes make the payload **active** on the target. Test
 in the lab first and document all changes.
+
