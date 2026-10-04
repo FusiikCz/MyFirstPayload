@@ -1,111 +1,59 @@
-# Repo overview
+# LAB — mock prostředí
 
-Tento repozitář obsahuje jednoduchý proof-of-concept stack pro:
-- OCR CAPTCHA v Pythonu,
-- server pro sběr dat z prohlížeče,
-- JavaScript payload, který odesílá data na C2 server,
-- ukázku jednoduchého „worm-like“ šíření v omezeném testovacím prostředí.
+Izolovaný mock web (zranitelná i zabezpečená varianta) pro bezpečné studium
+celého řetězu. Nic z toho nesmí směřovat na veřejný internet.
 
-Vše je navrženo jako lokální demonstrační materiál, ne jako produkční aplikace ani nasazený webový systém.
-
----
-
-## Struktura repozitáře
-
-### main.py
-Hlavní skript pro OCR captcha. Rozpoznává obrázek s 4 sloupci čísel na zeleném pozadí, rozdělí ho na segmenty, aplikuje různé OCR konfigurace přes Tesseract a vrátí řetězec čísel.
-
-V praxi:
-- načte obrázek z disku,
-- vytvoří binární masku bílých pixelů,
-- spočítá bílé pixely po sloupcích,
-- rozsekne obraz na 4 části,
-- použije Tesseract pro každý segment,
-- vrátí čísla a součet prvních dvou.
-
-### c2.py
-Flask server pro příjem dat z prohlížeče a pro zpracování captcha. Ukládá data do SQLite databáze a poskytuje jednoduché endpointy pro:
-- `/hello` – příchod nové oběti / cookies / URL,
-- `/k` – keylogging data,
-- `/p` – obsah schránky,
-- `/f` – data formuláře,
-- `/beacon` – heartbeat / příkazy pro oběť,
-- `/solve` – OCR captcha z base64 obrázku.
-
-Součástí je i jednoduchý dashboard a logování událostí do databáze.
-
-### payload
-Ukázkový JavaScript payload, který má být vložen do prohlížeče. Zachytává:
-- cookies,
-- text psaný na klávesnici,
-- data formulářů při submitu,
-- aktuální URL a další metadata,
-- a odesílá je na C2 endpoint.
-
-Tento soubor je spíše reference pro testování chování v izolovaném prostředí.
-
-### worm
-Ukázka „šířícího se“ payloadu, která simuluje známé schéma v omezeném sandboxovém prostředí:
-- získá nový inzerát / formulář,
-- stáhne captcha,
-- odešle ji na C2 `/solve`,
-- spočítá výsledek,
-- repopuluje payload / další přístup.
-
-To je demonstrační workflow pro studium automatického šíření v kontrolovaném prostředí.
-
----
-
-## Jak spolu soubory pracují
-
-1. `payload` běží v prohlížeči.
-2. Odesílá data na `c2.py` přes HTTP endpointy.
-3. `c2.py` ukládá data do SQLite a zpracovává captcha přes OCR.
-4. `main.py` obsahuje podobnou logiku OCR jako serverová část, ale běží lokálně nad obrázkem na disku.
-5. `worm` slouží jako ukázka automatizace a replikace v omezeném experimentálním prostředí.
-
----
-
-## Předpoklady
-
-Python balíčky:
-- Flask
-- Pillow
-- NumPy
-- Tesseract OCR nainstalovaný v systému
-
-Pro lokální běh:
+## Spuštění (5 minut)
 
 ```bash
-pip install flask pillow numpy
-python c2.py
+# 1) mapování lab hosta (Linux/mac: /etc/hosts, Windows: drivers\etc\hosts)
+127.0.0.1   lab.local
+
+# 2) mock web (vyžaduje php + php-gd)
+cd lab && php -S 0.0.0.0:8000
+
+# 3) C2 (jiný terminál)
+python3 c2.py          # vypíše TOKEN
+
+# 4) prohlížeč: http://lab.local:8000  (VULNERABLE)  /  ?safe=1 (PATCHED)
 ```
 
-A potom:
+## Testovací scénář
+
+1. **VULNERABLE režim:** vlož payload z `payload_lab.txt` do pole "Text",
+   odešli (zadej správný součet captchy), otevři vytvořený inzerát
+   → v prohlížeči se spustí JS, události přibývají v C2 dashboardu.
+2. **PATCHED režim:** přepni na `?safe=1`, vlož stejný payload
+   → payload se zobrazí jako text, nespustí se (escapování + CSP).
+3. **Replikace:** použij payload z `worm_lab.txt`, po beaconu zavolej
+   `curl "http://127.0.0.1:8080/spread?token=<TOKEN>"`
+   → červ řeší captchu přes C2 `/solve` a vkládá nové inzeráty na mock webu.
+4. **Měření:** `/export?token=<TOKEN>` → JSON pro analýzu (rychlost šíření,
+   úspěšnost OCR, efekt rate-limitu).
+
+## Automatický self-test (bez prohlížeče)
+
+`test_c2.sh` ověří celý C2 řetěz na loopbacku a sám se uklidí:
 
 ```bash
-python main.py capx.png
+bash lab/test_c2.sh
+# testuje: ochrana tokenem (401/200), /hello /k /p /f (204),
+#          beacon -> spread -> beacon (SPREAD/Consumed),
+#          /solve OCR proti PIL vzorku z gen_captcha.py,
+#          /export obsahuje události
+# očekávaný výstup: PASS=10 FAIL=0
 ```
 
----
+`gen_captcha.py` vygeneruje vzorovou captchu (stejný styl jako `captcha.php`)
+do `/tmp/cap_lab.jpg` a ground-truth do `/tmp/cap_lab.info` — používá se v self-testu.
 
-## Důležité upozornění
+Pozn.: `/solve` očekává obrázek jako base64 v query (`?img=`); v URL je nutné
+base64 URL-enkódovat (`curl -G --data-urlencode`), jinak `+` rozbije query string.
 
-Tento repozitář je určen výhradně pro:
-- bezpečnostní výzkum,
-- interní demo a lokální testování,
-- autorizované experimenty v izolovaném prostředí.
+## Co si všímat (research notes)
 
-Není určen k produkčnímu nasazení ani k použití proti reálným službám, uživatelům nebo webům bez výslovného oprávnění.
-
----
-
-## Shrnutí
-
-Repo je v podstatě malý demonstrační projekt, který kombinuje:
-- OCR pro segmentované captcha,
-- Python Flask server pro sběr dat,
-- JS payload pro záznam kláves / cookies / formulářů,
-- jednoduchý replikující workflow v sandboxovém stylu.
-
-Cílem je ukázat, jak taková architektura vypadá v kontrolovaném prostředí a jaké části kódu spolu souvisí.
+- OCR má ~70–85 % úspěšnost na první dvě číslice; měř, kolik replikací
+  selže (payload bez retry se "ticho" zastaví).
+- CSP v PATCHED režimu zablokuje `onerror` i XHR na C2 — to je hlavní obrana.
+- HttpOnly cookie v mocku nenastavujeme; v DEFENSE.md je přesný postup,
+  jak ji nasadit v reálné aplikaci.
