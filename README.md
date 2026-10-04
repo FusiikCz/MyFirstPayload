@@ -1,3 +1,13 @@
+# MyFirstPayload — lab-only XSS/replication research PoC
+
+> ## ⚠️ DISCLAIMER — READ BEFORE PROCEEDING
+> This repository is **laboratory research material** intended for an
+> isolated environment that you own. It is **not a tool for attacking real
+> websites**. Executable code is deliberately inert outside the lab (host
+> guard for `lab.local`, C2 at `127.0.0.1`, self-replication disabled by
+> default). Attacking systems without authorization is illegal. See
+> **[DISCLAIMER.md](DISCLAIMER.md)** for details.
+
 # LAB — mock environment
 
 An isolated mock website with vulnerable and patched modes for safely

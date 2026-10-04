@@ -62,9 +62,9 @@ echo
 echo "[test] 2) collection endpoints (expect 204)"
 for path in \
     "/hello?vid=${VID}&u=http://lab.local/index.php&co=TESTCOOKIE" \
-    "/k?vid=${VID}&k=heslo123" \
+    "/k?vid=${VID}&k=test123" \
     "/p?vid=${VID}&p=schranka" \
-    "/f?vid=${VID}&d=jmeno%3Dmaxik"; do
+    "/f?vid=${VID}&d=name%3Dlabtester"; do
     code=$(curl -s -o /dev/null -w '%{http_code}' "${BASE}${path}")
     [ "${code}" = "204" ] && ok "GET ${path} -> 204" || bad "GET ${path} -> ${code} (expected 204)"
 done
